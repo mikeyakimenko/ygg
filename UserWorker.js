@@ -55,7 +55,6 @@ class buildUserResponse {
     return {
       id: user.id,
       name: user.name,
-      posts: this.posts,
       followers: this.getFollowers(),
       following: this.getFollowing(),
       feed: this.createUserFeed()
