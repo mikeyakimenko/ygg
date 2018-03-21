@@ -2,6 +2,7 @@ const express = require('express')
 const bodyParser = require('body-parser')
 const app = express()
 const port = process.env.PORT || 3000
+const AwesomeRandom = require('random-number-in-range')
 
 app.use(bodyParser.json())
 
@@ -10,58 +11,63 @@ const Models = require('./models.js')
 
 // helpers
 const UserWorker = require('./UserWorker.js')
+const makeListOfIds = (itemsarray) => itemsarray.map((item) => { return item.id })
+const addFollows = (usrId, usersIds) => {
+
+  let follows = []
+
+  let uniqueAddFollows = (usrId, usersIds, follows) => {
+    let _id = usersIds[(Math.floor(Math.random() * usersIds.length) + 1) - 1]
+
+    if (_id !== usrId && !follows.includes(_id)) {
+      follows.push(_id)
+    } else {
+      uniqueAddFollows(usrId, usersIds, follows)
+    }
+  }
+
+  for (let i=0; i<AwesomeRandom(1, 20); i++) {
+    uniqueAddFollows(usrId, usersIds, follows)
+  }
+
+  return follows
+}
 
 // memmory
 const _posts = []
 const _users = []
 
 // Faked data
-// imports
-const AwesomeRandom = require('random-number-in-range')
 const Faked = require('./faked.js')
 
-// main fake function
 const faker = () => {
-  for (let i=0; i<20; i++) {
-    let user = Models.user.create({name: Faked.getFakedName()})
+  for (let i=0; i<Math.floor(Math.random() * 31) + 50; i++) {
+    let user = Models.user.create({name: Faked.getFakedName()}, makeListOfIds(_users))
     _users.push(user)
   }
 
-  let usersIds = _users.map((item) => { return item.id })
+  let usersIds = makeListOfIds(_users)
 
   for (let i=0; i<_users.length; i++) {
-    let id = _users[i].id
-    let rawFollovers = []
-    let rawFollowing = []
+    let user = _users[i]
 
-    for (let i=0; i<AwesomeRandom(1, 10); i++) {
-      rawFollovers.push(usersIds[AwesomeRandom(1, usersIds.length - 1)])
-    }
+    let followers = addFollows(user.id, usersIds)
+    let following = addFollows(user.id, usersIds)
 
-    for (let i=0; i<AwesomeRandom(1, 8); i++) {
-      rawFollowing.push(usersIds[AwesomeRandom(1, usersIds.length - 1)])
-    }
-
-    let followers = new Set(rawFollovers)
-    let following = new Set(rawFollowing)
-
-    _users[i].followers = [...followers]
-    _users[i].following = [...following]
+    user.followers = [...followers]
+    user.following = [...following]
   }
 
   for (let i=0; i<_users.length; i++) {
-    let id = _users[i].id
-    let counter = 0
-    let counterStop = AwesomeRandom(1, usersIds.length - 1)
-    let interval = setInterval(() => {
+    let user = _users[i]
+
+    for (let j=0; j<AwesomeRandom(20); j++) {
       let content = Faked.getFakedPost()
-      let postData = {userId: id, content: content}
-      let post = Models.post.create(postData)
+      let postData = {userId: user.id, content: content}
+      let post = Models.post.create(postData, makeListOfIds(_posts))
       _posts.push(post)
-      if (counter === counterStop) {
-        clearInterval(interval)
-      }
-    }, 3000)
+      user.posts.push(post.id)
+    }
   }
 }
 
@@ -128,7 +134,7 @@ app.post('/users/unfollow/:id', (req, res) => {
 
 // create a user
 app.post('/users/create', (req, res) => {
-  let user = Models.user.create(req.body)
+  let user = Models.user.create(req.body, makeListOfIds(_users))
   if (user) {
       _users.push(user)
       res.json(user)
@@ -145,7 +151,7 @@ app.get('/posts', (req, res) => {
 // create a post
 app.post('/posts/create', (req, res) => {
   if (req.body.content.length <= 100) {
-      let post = Models.post.create(req.body)
+      let post = Models.post.create(req.body, makeListOfIds(_posts))
       if (post) {
           _posts.push(post)
           res.json(post)
